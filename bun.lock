@@ -8,7 +8,7 @@
         "@react-three/fiber": "^9.1.0",
         "@tailwindcss/vite": "^4.0.14",
         "@types/three": "^0.174.0",
-        "lottie-react": "^2.4.1",
+        "@vercel/analytics": "^1.5.0",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
         "tailwindcss": "^4.0.14",
@@ -256,6 +256,8 @@
 
     "@use-gesture/react": ["@use-gesture/react@10.3.1", "", { "dependencies": { "@use-gesture/core": "10.3.1" }, "peerDependencies": { "react": ">= 16.8.0" } }, "sha512-Yy19y6O2GJq8f7CHf7L0nxL8bf4PZCPaVOCgJrusOeFHY1LvHgYXnmnXg6N5iwAnbgbZCDjo60SiM6IPJi9C5g=="],
 
+    "@vercel/analytics": ["@vercel/analytics@1.5.0", "", { "peerDependencies": { "@remix-run/react": "^2", "@sveltejs/kit": "^1 || ^2", "next": ">= 13", "react": "^18 || ^19 || ^19.0.0-rc", "svelte": ">= 4", "vue": "^3", "vue-router": "^4" }, "optionalPeers": ["@remix-run/react", "@sveltejs/kit", "next", "react", "svelte", "vue", "vue-router"] }, "sha512-MYsBzfPki4gthY5HnYN7jgInhAZ7Ac1cYDoRWFomwGHWEX7odTEzbtg9kf/QSo7XEsEAqlQugA6gJ2WS2DEa3g=="],
+
     "@vitejs/plugin-react-swc": ["@vitejs/plugin-react-swc@3.8.0", "", { "dependencies": { "@swc/core": "^1.10.15" }, "peerDependencies": { "vite": "^4 || ^5 || ^6" } }, "sha512-T4sHPvS+DIqDP51ifPqa9XIRAz/kIvIi8oXcnOZZgHmMotgmmdxe/DD5tMFlt5nuIRzT0/QuiwmKlH0503Aapw=="],
 
     "@webgpu/types": ["@webgpu/types@0.1.56", "", {}, "sha512-JkT4ngqwk4gKAFoWtXCcC1+TGhSStVtauS9z27slOGSFYr+QqjS0CoawiAxP7Gq9xkT4Pw9uouvWPT44HwbUiw=="],
@@ -437,10 +439,6 @@
     "locate-path": ["locate-path@6.0.0", "", { "dependencies": { "p-locate": "^5.0.0" } }, "sha512-iPZK6eYjbxRu3uB4/WZ3EsEIMJFMqAoopl3R+zuq0UjcAm/MO6KCweDgPfP3elTztoKP3KtnVHxTn2NHBSDVUw=="],
 
     "lodash.merge": ["lodash.merge@4.6.2", "", {}, "sha512-0KpjqXRVvrYyCsX1swR/XTK0va6VQkQM6MNo7PqW77ByjAhoARA8EfrP1N4+KlKj8YS0ZUCtRT/YUuhyYDujIQ=="],
-
-    "lottie-react": ["lottie-react@2.4.1", "", { "dependencies": { "lottie-web": "^5.10.2" }, "peerDependencies": { "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0", "react-dom": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0" } }, "sha512-LQrH7jlkigIIv++wIyrOYFLHSKQpEY4zehPicL9bQsrt1rnoKRYCYgpCUe5maqylNtacy58/sQDZTkwMcTRxZw=="],
-
-    "lottie-web": ["lottie-web@5.12.2", "", {}, "sha512-uvhvYPC8kGPjXT3MyKMrL3JitEAmDMp30lVkuq/590Mw9ok6pWcFCwXJveo0t5uqYw1UREQHofD+jVpdjBv8wg=="],
 
     "maath": ["maath@0.10.8", "", { "peerDependencies": { "@types/three": ">=0.134.0", "three": ">=0.134.0" } }, "sha512-tRvbDF0Pgqz+9XUa4jjfgAQ8/aPKmQdWXilFu2tMy4GWj4NOsx99HlULO4IeREfbO3a0sA145DZYyvXPkybm0g=="],
 
