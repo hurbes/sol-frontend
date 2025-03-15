@@ -5,33 +5,42 @@ import { Color, Vector3, Box3 } from 'three'
 import Player from './Player'
 import Gem from './Gem'
 
-// Game area boundaries
+
 const GAME_BOUNDS = {
     width: 80,
     length: 80,
 }
 
-// Gem generation settings
-const GEM_SPAWN_COUNT = 300 // Increased from 200 to 300 gems
 
-// Player movement settings
-const BASE_PLAYER_SPEED = 0.08 // Increased initial speed
-const MIN_PLAYER_SPEED = 0.03 // Minimum speed when tail is very long
-const TAIL_SEGMENT_PER_GEMS = 10 // Add a new tail segment for every 10 gems collected
+const GAME_STATE = {
+    PLAYING: 'playing',
+    GAME_OVER: 'gameover'
+}
 
-// Minimap component that shows the bounded game area
+
+const BOUNDARY_COLLISION_THRESHOLD = 1.2
+
+
+const GEM_SPAWN_COUNT = 300
+
+
+const BASE_PLAYER_SPEED = 0.08
+const MIN_PLAYER_SPEED = 0.03
+const TAIL_SEGMENT_PER_GEMS = 10
+
+
 function Minimap({ playerPosition, gems }: {
     playerPosition: Vector3,
     gems: { id: number; position: [number, number, number] }[]
 }) {
-    const minimapSize = 320 // Increased size from 150 to 220 pixels
+    const minimapSize = 320
 
-    // Calculate scale based on game bounds to fit the minimap
+
     const scale = minimapSize / Math.max(GAME_BOUNDS.width, GAME_BOUNDS.length)
 
-    // Convert world coordinates to minimap coordinates
+
     const worldToMap = (x: number, z: number) => {
-        // Center the map and scale coordinates
+
         return {
             x: minimapSize / 2 + x * scale,
             y: minimapSize / 2 + z * scale,
@@ -81,7 +90,7 @@ function Minimap({ playerPosition, gems }: {
     )
 }
 
-// FPS Counter component
+
 function FpsCounter() {
     const [fps, setFps] = useState(0);
 
@@ -96,7 +105,7 @@ function FpsCounter() {
             frameTime += now - lastTime;
             lastTime = now;
 
-            // Update FPS every second
+
             if (frameTime >= 1000) {
                 setFps(Math.round((frameCount * 1000) / frameTime));
                 frameCount = 0;
@@ -120,14 +129,16 @@ function FpsCounter() {
     );
 }
 
-// Add a simple UI overlay for instructions and stats
-function GameUI({ gemCount, collectedGems, playerPosition, gems }: {
+
+function GameUI({ gemCount, collectedGems, playerPosition, gems, gameState, onRestart }: {
     gemCount: number;
     collectedGems: number;
     playerPosition: Vector3;
     gems: { id: number; position: [number, number, number] }[];
+    gameState: string;
+    onRestart: () => void;
 }) {
-    // Calculate tail segments and speed for display
+
     const tailSegments = Math.floor(collectedGems / TAIL_SEGMENT_PER_GEMS);
     const playerSpeed = Math.max(
         MIN_PLAYER_SPEED,
@@ -140,22 +151,40 @@ function GameUI({ gemCount, collectedGems, playerPosition, gems }: {
             <Minimap playerPosition={playerPosition} gems={gems} />
             <FpsCounter />
 
-            <div className="absolute left-0 bottom-0 w-full p-4">
-                <div className="flex justify-between">
-                    <div className="bg-black/50 p-2 rounded text-white text-sm">
-                        <p>Move your mouse to control direction</p>
-                        <p>Player will move towards mouse pointer</p>
-                        <p className="text-yellow-200">Stay within the game boundaries</p>
-                        <p className="text-blue-300">Tail Length: {tailSegments} segments</p>
-                        <p className="text-green-300">Speed: {speedPercentage}%</p>
-                    </div>
-                    <div className="bg-black/50 p-2 rounded text-white text-sm">
-                        <p>Active Gems: {gemCount}</p>
-                        <p className="text-yellow-300 font-bold">Collected: {collectedGems} ✨</p>
-                        <p className="text-gray-300 text-xs">Every {TAIL_SEGMENT_PER_GEMS} gems add 1 tail segment</p>
+            {gameState === GAME_STATE.PLAYING && (
+                <div className="absolute left-0 bottom-0 w-full p-4">
+                    <div className="flex justify-between">
+                        <div className="bg-black/50 p-2 rounded text-white text-sm">
+                            <p>Move your mouse to control direction</p>
+                            <p>Player will move towards mouse pointer</p>
+                            <p className="text-yellow-200">Stay within the game boundaries</p>
+                            <p className="text-blue-300">Tail Length: {tailSegments} segments</p>
+                            <p className="text-green-300">Speed: {speedPercentage}%</p>
+                        </div>
+                        <div className="bg-black/50 p-2 rounded text-white text-sm">
+                            <p>Active Gems: {gemCount}</p>
+                            <p className="text-yellow-300 font-bold">Collected: {collectedGems} ✨</p>
+                            <p className="text-gray-300 text-xs">Every {TAIL_SEGMENT_PER_GEMS} gems add 1 tail segment</p>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
+
+            {gameState === GAME_STATE.GAME_OVER && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                    <div className="bg-black/80 p-8 rounded-lg text-center border-2 border-red-500/50 shadow-lg">
+                        <h2 className="text-3xl font-bold text-red-500 mb-4">GAME OVER</h2>
+                        <p className="text-xl text-white mb-6">Your snake hit the wall!</p>
+                        <p className="text-white mb-8">Final Score: <span className="text-yellow-300 font-bold">{collectedGems} gems</span></p>
+                        <button
+                            className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200 shadow-lg"
+                            onClick={onRestart}
+                        >
+                            Play Again
+                        </button>
+                    </div>
+                </div>
+            )}
         </>
     )
 }
@@ -165,6 +194,18 @@ function Game() {
     const [collectedGems, setCollectedGems] = useState(0)
     const [playerPosition, setPlayerPosition] = useState(new Vector3(0, 0, 0))
     const [gems, setGemsForUI] = useState<{ id: number; position: [number, number, number] }[]>([])
+    const [gameState, setGameState] = useState(GAME_STATE.PLAYING)
+
+
+    const handleGameOver = () => {
+        setGameState(GAME_STATE.GAME_OVER);
+    }
+
+
+    const handleRestart = () => {
+        setCollectedGems(0);
+        setGameState(GAME_STATE.PLAYING);
+    }
 
     return (
         <div className="fixed inset-0 w-screen h-screen overflow-hidden m-0 p-0">
@@ -188,6 +229,8 @@ function Game() {
                     onPlayerMove={setPlayerPosition}
                     onGemsChange={setGemsForUI}
                     collectedGems={collectedGems}
+                    gameState={gameState}
+                    onGameOver={handleGameOver}
                 />
             </Canvas>
             <GameUI
@@ -195,6 +238,8 @@ function Game() {
                 collectedGems={collectedGems}
                 playerPosition={playerPosition}
                 gems={gems}
+                gameState={gameState}
+                onRestart={handleRestart}
             />
         </div>
     )
@@ -206,9 +251,11 @@ interface SceneProps {
     onPlayerMove: (position: Vector3) => void;
     onGemsChange: (gems: { id: number; position: [number, number, number] }[]) => void;
     collectedGems: number;
+    gameState: string;
+    onGameOver: () => void;
 }
 
-// Define a type for gems with animation state
+
 interface AnimatedGem {
     id: number;
     position: [number, number, number];
@@ -216,7 +263,7 @@ interface AnimatedGem {
     collectionProgress: number;
 }
 
-function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, collectedGems }: SceneProps) {
+function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, collectedGems, gameState, onGameOver }: SceneProps) {
     const { camera } = useThree()
     const playerRef = useRef(new Vector3(0, 0, 0))
     const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
@@ -224,20 +271,20 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, col
     const lastGemId = useRef(0)
     const frameCount = useRef(0)
 
-    // Calculate tail segments based on collected gems
+
     const tailSegments = Math.floor(collectedGems / TAIL_SEGMENT_PER_GEMS)
 
-    // Calculate player speed based on tail length
+
     const playerSpeed = Math.max(
         MIN_PLAYER_SPEED,
-        BASE_PLAYER_SPEED * (1 - (tailSegments * 0.02)) // Reduce speed by 2% per tail segment
+        BASE_PLAYER_SPEED * (1 - (tailSegments * 0.02))
     )
 
-    // Constants for gem collection animation
-    const GEM_ATTRACTION_DISTANCE = 1.8; // Reduced from 2.5 to 1.8 units
-    const GEM_ANIMATION_SPEED = 0.04; // Slowed down from 0.08 to 0.04 (50% slower)
 
-    // Create the bounding box for the game area
+    const GEM_ATTRACTION_DISTANCE = 1.8;
+    const GEM_ANIMATION_SPEED = 0.04;
+
+
     const gameBounds = useMemo(() => {
         return new Box3(
             new Vector3(-GAME_BOUNDS.width / 2, 0, -GAME_BOUNDS.length / 2),
@@ -245,7 +292,43 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, col
         )
     }, [])
 
-    // Add sound effect for gem collection
+
+    const checkBoundaryCollision = (position: Vector3): boolean => {
+
+        const distToLeft = Math.abs(position.x - gameBounds.min.x);
+        const distToRight = Math.abs(position.x - gameBounds.max.x);
+        const distToFront = Math.abs(position.z - gameBounds.min.z);
+        const distToBack = Math.abs(position.z - gameBounds.max.z);
+
+
+        return (
+            distToLeft < BOUNDARY_COLLISION_THRESHOLD ||
+            distToRight < BOUNDARY_COLLISION_THRESHOLD ||
+            distToFront < BOUNDARY_COLLISION_THRESHOLD ||
+            distToBack < BOUNDARY_COLLISION_THRESHOLD
+        );
+    }
+
+
+    useEffect(() => {
+        if (gameState === GAME_STATE.PLAYING) {
+
+            if (camera) {
+                camera.position.set(0, 15, 0);
+                camera.lookAt(0, 0, 0);
+            }
+
+
+            const initialGems = [];
+            for (let i = 0; i < GEM_SPAWN_COUNT; i++) {
+                const newGem = generateGem();
+                initialGems.push(newGem);
+            }
+            setGems(initialGems);
+        }
+    }, [gameState, camera]);
+
+
     const [playCollectSound] = useState(() => {
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
 
@@ -254,10 +337,10 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, col
             const gain = audioContext.createGain();
 
             oscillator.type = 'sine';
-            oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5
+            oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
             oscillator.frequency.exponentialRampToValueAtTime(
                 440, audioContext.currentTime + 0.1
-            ); // A4
+            );
 
             gain.gain.setValueAtTime(0.3, audioContext.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
@@ -270,13 +353,41 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, col
         };
     });
 
-    // Update mouse position
+
+    const [playGameOverSound] = useState(() => {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+
+        return () => {
+            const oscillator = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+
+            oscillator.type = 'sawtooth';
+            oscillator.frequency.setValueAtTime(220, audioContext.currentTime);
+            oscillator.frequency.exponentialRampToValueAtTime(
+                110, audioContext.currentTime + 0.3
+            );
+
+            gain.gain.setValueAtTime(0.4, audioContext.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
+
+            oscillator.connect(gain);
+            gain.connect(audioContext.destination);
+
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + 0.5);
+        };
+    });
+
+
     useEffect(() => {
         const handleMouseMove = (event: MouseEvent) => {
-            setMousePosition({
-                x: (event.clientX / window.innerWidth) * 2 - 1,
-                y: -(event.clientY / window.innerHeight) * 2 + 1
-            })
+
+            if (gameState === GAME_STATE.PLAYING) {
+                setMousePosition({
+                    x: (event.clientX / window.innerWidth) * 2 - 1,
+                    y: -(event.clientY / window.innerHeight) * 2 + 1
+                });
+            }
         }
 
         window.addEventListener('mousemove', handleMouseMove)
@@ -284,21 +395,21 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, col
         return () => {
             window.removeEventListener('mousemove', handleMouseMove)
         }
-    }, [])
+    }, [gameState])
 
     useEffect(() => {
-        // Set initial camera position (higher up for better overview)
+
         camera.position.set(0, 15, 0)
         camera.lookAt(0, 0, 0)
     }, [camera])
 
-    // Effect to notify parent component of gem count and filter out gems being collected
+
     useEffect(() => {
-        // Only count gems that aren't being collected
+
         const activeGems = gems.filter(gem => !gem.isBeingCollected);
         onGemCountChange(activeGems.length)
 
-        // For UI, make a simplified version without animation info
+
         const simplifiedGems = gems.map(gem => ({
             id: gem.id,
             position: gem.position
@@ -306,7 +417,7 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, col
         onGemsChange(simplifiedGems)
     }, [gems, onGemCountChange, onGemsChange])
 
-    // Spawn initial gems immediately
+
     useEffect(() => {
         const initialGems = []
         for (let i = 0; i < GEM_SPAWN_COUNT; i++) {
@@ -316,7 +427,7 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, col
         setGems(initialGems)
     }, [])
 
-    // Function to generate a new gem at a random position within game bounds
+
     const generateGem = (): AnimatedGem => {
         const x = Math.random() * GAME_BOUNDS.width - GAME_BOUNDS.width / 2
         const z = Math.random() * GAME_BOUNDS.length - GAME_BOUNDS.length / 2
@@ -329,11 +440,14 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, col
         }
     }
 
-    // Check for gem collection and update gems
+
     useFrame(() => {
-        // Update player reference position
+
+        if (gameState === GAME_STATE.GAME_OVER) return;
+
+
         if (camera) {
-            // Keep player within bounds
+
             const newX = Math.max(
                 gameBounds.min.x,
                 Math.min(gameBounds.max.x, camera.position.x)
@@ -343,44 +457,53 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, col
                 Math.min(gameBounds.max.z, camera.position.z)
             )
 
-            // Update camera position to stay within bounds
+
             if (camera.position.x !== newX || camera.position.z !== newZ) {
                 camera.position.x = newX
                 camera.position.z = newZ
             }
 
+
             playerRef.current.set(camera.position.x, 0, camera.position.z)
             onPlayerMove(playerRef.current.clone())
+
+
+            if (checkBoundaryCollision(playerRef.current)) {
+
+                onGameOver();
+                playGameOverSound();
+                return;
+            }
         }
 
-        // Check for gem collection and update gem animations
+
         const playerPos = playerRef.current
         let gemCollected = false;
 
-        // Update gems (animate collection and remove completed ones)
+
         const updatedGems = gems.map(gem => {
-            // Skip gems that are already being collected
+
             if (gem.isBeingCollected) {
-                // Update animation progress
+
                 const newProgress = gem.collectionProgress + GEM_ANIMATION_SPEED;
 
-                // If animation complete, mark for collection
+
                 if (newProgress >= 1) {
                     gemCollected = true;
-                    return null; // Will be filtered out
+                    return null;
                 }
 
-                // Update gem position to move toward player
+
                 const startPos = new Vector3(gem.position[0], gem.position[1], gem.position[2]);
 
-                // Create a more natural arc motion with slight vertical lift as it moves
+
                 const lerpPos = startPos.clone().lerp(playerPos, newProgress);
 
-                // Add a slight arc to the path (higher in the middle of the animation)
-                const arcHeight = 0.5 * Math.sin(newProgress * Math.PI); // Peaks at middle of animation
+
+                const arcHeight = 0.5 * Math.sin(newProgress * Math.PI);
                 lerpPos.y += arcHeight;
 
-                // Return updated gem with new position and progress
+
                 return {
                     ...gem,
                     position: [lerpPos.x, lerpPos.y, lerpPos.z] as [number, number, number],
@@ -388,11 +511,11 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, col
                 };
             }
 
-            // Check if gem should start being collected
+
             const gemPos = new Vector3(gem.position[0], gem.position[1], gem.position[2]);
             const distance = gemPos.distanceTo(playerPos);
 
-            // Start collection animation if close enough
+
             if (distance < GEM_ATTRACTION_DISTANCE) {
                 return {
                     ...gem,
@@ -401,20 +524,20 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, col
                 };
             }
 
-            // If it's not being collected and not close enough, keep it as is
-            return gem;
-        }).filter(Boolean) as AnimatedGem[]; // Filter out nulls (completed animations)
 
-        // If a gem was fully collected, play sound and trigger reward
+            return gem;
+        }).filter(Boolean) as AnimatedGem[];
+
+
         if (gemCollected) {
             onGemCollect();
             playCollectSound();
         }
 
-        // Update state with animated gems
+
         setGems(updatedGems);
 
-        // Spawn new gems if needed (less frequently)
+
         frameCount.current += 1
         if (frameCount.current % 10 === 0) {
             const activeGems = updatedGems.filter(gem => !gem.isBeingCollected);
@@ -438,6 +561,7 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, col
                 gameBounds={gameBounds}
                 tailSegments={tailSegments}
                 speed={playerSpeed}
+                gameState={gameState}
             />
 
             {/* Render all gems with animation effects */}
@@ -453,7 +577,7 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, col
     )
 }
 
-// Component to render the game floor and walls
+
 function BoundedGameArea() {
     return (
         <group>

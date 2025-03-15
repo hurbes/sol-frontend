@@ -7,15 +7,16 @@ interface PlayerProps {
     gameBounds: Box3
     tailSegments: number
     speed: number
+    gameState?: string
 }
 
-// Tail segment component
+
 function TailSegment({ position, index }: { position: Vector3; index: number }) {
-    // Gradient color from blue to purple based on index
+
     const colorValue = Math.min(0.6 + index * 0.03, 1);
     const segmentColor = new Color(0.3, 0.3, colorValue);
 
-    // Size gets slightly smaller the further back in the tail
+
     const sizeMultiplier = Math.max(0.8, 1 - index * 0.015);
     const segmentSize = 0.25 * sizeMultiplier;
 
@@ -33,7 +34,7 @@ function TailSegment({ position, index }: { position: Vector3; index: number }) 
     );
 }
 
-function Player({ mousePosition, gameBounds, tailSegments, speed }: PlayerProps) {
+function Player({ mousePosition, gameBounds, tailSegments, speed, gameState = 'playing' }: PlayerProps) {
     const playerRef = useRef<Mesh>(null)
     const { camera } = useThree()
     const speedRef = useRef(speed)
@@ -42,15 +43,18 @@ function Player({ mousePosition, gameBounds, tailSegments, speed }: PlayerProps)
     const targetPoint = useRef(new Vector3())
     const mouse2D = useRef(new Vector2())
 
-    // Store tail segment positions
+
     const [tailPositions, setTailPositions] = useState<Vector3[]>([]);
 
-    // Store player position history for tail segments to follow
-    const positionHistory = useRef<Vector3[]>([]);
-    const MAX_HISTORY = 300; // Maximum positions to store (for very long tails)
-    const SEGMENT_SPACING = 5; // How many positions to skip between segments
 
-    // Update speed ref when speed prop changes
+    const positionHistory = useRef<Vector3[]>([]);
+    const MAX_HISTORY = 300;
+    const SEGMENT_SPACING = 5;
+
+
+    const gameOverTime = useRef(0);
+
+
     useEffect(() => {
         speedRef.current = speed;
     }, [speed]);
@@ -66,7 +70,7 @@ function Player({ mousePosition, gameBounds, tailSegments, speed }: PlayerProps)
         return diff
     }
 
-    // Function to constrain position within game boundaries
+
     const constrainToGameBounds = (position: Vector3): Vector3 => {
         return new Vector3(
             Math.max(gameBounds.min.x, Math.min(gameBounds.max.x, position.x)),
@@ -75,14 +79,37 @@ function Player({ mousePosition, gameBounds, tailSegments, speed }: PlayerProps)
         )
     }
 
-    // Initialize position history
+
     useEffect(() => {
         const initialPosition = new Vector3(0, 0.5, 0);
         positionHistory.current = Array(MAX_HISTORY).fill(initialPosition.clone());
     }, []);
 
-    useFrame(() => {
+    useFrame((state) => {
         if (!playerRef.current || !camera) return
+
+
+        if (gameState === 'gameover') {
+
+            gameOverTime.current += 0.05;
+            const shakeAmount = Math.exp(-gameOverTime.current) * 0.2;
+
+
+            if (playerRef.current) {
+                playerRef.current.rotation.z = Math.sin(state.clock.elapsedTime * 20) * shakeAmount;
+                playerRef.current.position.y = 0.5 + Math.sin(gameOverTime.current * 5) * 0.1;
+
+
+                playerRef.current.children.forEach((child, index) => {
+                    if (child instanceof Mesh) {
+                        child.position.y -= 0.02;
+                    }
+                });
+            }
+
+            return;
+        }
+
 
         mouse2D.current.set(mousePosition.x, mousePosition.y)
         raycaster.current.setFromCamera(mouse2D.current, camera)
@@ -100,31 +127,31 @@ function Player({ mousePosition, gameBounds, tailSegments, speed }: PlayerProps)
                 const angleDifference = shortestAngleBetween(currentRotation, targetAngle)
                 playerRef.current.rotation.y += angleDifference * 0.1
 
-                // Calculate potential new position - use the dynamic speed
+
                 const newX = camera.position.x + direction.x * speedRef.current
                 const newZ = camera.position.z + direction.z * speedRef.current
 
-                // Check if new position is within bounds
+
                 const constrainedPosition = constrainToGameBounds(new Vector3(newX, camera.position.y, newZ))
 
-                // Update camera and player positions
+
                 camera.position.x = constrainedPosition.x
                 camera.position.z = constrainedPosition.z
                 playerRef.current.position.x = camera.position.x
                 playerRef.current.position.z = camera.position.z
 
-                // Record the current position for tail segments
+
                 const currentPos = new Vector3(
                     playerRef.current.position.x,
-                    0.5, // Fixed height
+                    0.5,
                     playerRef.current.position.z
                 );
 
-                // Shift history and add new position
+
                 positionHistory.current.unshift(currentPos);
                 positionHistory.current = positionHistory.current.slice(0, MAX_HISTORY);
 
-                // Update tail positions
+
                 if (tailSegments > 0) {
                     const newTailPositions = [];
                     for (let i = 0; i < tailSegments; i++) {
