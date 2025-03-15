@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Mesh, Vector3, Vector2, Raycaster, Plane, Box3, Color } from 'three'
+import { Mesh, Vector3, Vector2, Raycaster, Plane, Box3, Color, Group } from 'three'
 
 interface PlayerProps {
     mousePosition: { x: number; y: number }
@@ -10,6 +10,47 @@ interface PlayerProps {
     gameState?: string
 }
 
+function DirectionalArrow() {
+    const arrowRef = useRef<Group>(null);
+
+    useFrame((state) => {
+        if (arrowRef.current) {
+            // Make arrow hover up and down slightly
+            arrowRef.current.position.y = 0.2 + Math.sin(state.clock.elapsedTime * 2) * 0.1;
+        }
+    });
+
+    return (
+        <group ref={arrowRef} position={[0, 0.7, 3]}>
+            {/* Arrow shape - built from multiple elements */}
+            <group rotation={[Math.PI / 2, 0, 0]}>
+                {/* Arrow shaft */}
+                <mesh position={[0, -0.4, 0]}>
+                    <boxGeometry args={[0.3, 0.8, 0.1]} />
+                    <meshStandardMaterial
+                        color="#ffffff"
+                        emissive="#ffffff"
+                        emissiveIntensity={1}
+                        transparent={true}
+                        opacity={0.9}
+                    />
+                </mesh>
+
+                {/* Arrow head */}
+                <mesh position={[0, 0.4, 0]} rotation={[0, 0, Math.PI]}>
+                    <coneGeometry args={[0.4, 0.8, 3]} />
+                    <meshStandardMaterial
+                        color="#ffffff"
+                        emissive="#ffffff"
+                        emissiveIntensity={1}
+                        transparent={true}
+                        opacity={0.9}
+                    />
+                </mesh>
+            </group>
+        </group>
+    );
+}
 
 function TailSegment({ position, index }: { position: Vector3; index: number }) {
 
@@ -186,6 +227,9 @@ function Player({ mousePosition, gameBounds, tailSegments, speed, gameState = 'p
                         emissiveIntensity={0.8}
                     />
                 </mesh>
+
+                {/* Directional arrow above player */}
+                {gameState === 'playing' && <DirectionalArrow />}
             </mesh>
 
             {/* Render tail segments */}
