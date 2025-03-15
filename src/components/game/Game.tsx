@@ -4,17 +4,13 @@ import { useRef, useState, useEffect, useMemo } from 'react'
 import { Color, Vector3, Box3 } from 'three'
 import Player from './Player'
 import Gem from './Gem'
+import Minimap from './Minimap'
+import { GAME_STATE } from '../../hooks/useGameState'
 
 
 const GAME_BOUNDS = {
     width: 80,
     length: 80,
-}
-
-
-const GAME_STATE = {
-    PLAYING: 'playing',
-    GAME_OVER: 'gameover'
 }
 
 
@@ -27,68 +23,6 @@ const GEM_SPAWN_COUNT = 300
 const BASE_PLAYER_SPEED = 0.08
 const MIN_PLAYER_SPEED = 0.03
 const TAIL_SEGMENT_PER_GEMS = 10
-
-
-function Minimap({ playerPosition, gems }: {
-    playerPosition: Vector3,
-    gems: { id: number; position: [number, number, number] }[]
-}) {
-    const minimapSize = 320
-
-
-    const scale = minimapSize / Math.max(GAME_BOUNDS.width, GAME_BOUNDS.length)
-
-
-    const worldToMap = (x: number, z: number) => {
-
-        return {
-            x: minimapSize / 2 + x * scale,
-            y: minimapSize / 2 + z * scale,
-        }
-    }
-
-    return (
-        <div className="absolute left-4 top-4 bg-black/70 rounded-lg overflow-hidden border-2 border-white/30 shadow-lg"
-            style={{ width: `${minimapSize}px`, height: `${minimapSize}px` }}>
-            <div className="relative w-full h-full">
-                {/* Game bounds outline */}
-                <div className="absolute border border-white/50"
-                    style={{
-                        left: worldToMap(-GAME_BOUNDS.width / 2, 0).x,
-                        top: worldToMap(0, -GAME_BOUNDS.length / 2).y,
-                        width: GAME_BOUNDS.width * scale,
-                        height: GAME_BOUNDS.length * scale,
-                    }}
-                />
-
-                {/* Player dot */}
-                <div className="absolute bg-white rounded-full w-4 h-4"
-                    style={{
-                        left: `${worldToMap(playerPosition.x, playerPosition.z).x}px`,
-                        top: `${worldToMap(playerPosition.x, playerPosition.z).y}px`,
-                        transform: 'translate(-50%, -50%)',
-                        boxShadow: '0 0 4px 1px rgba(255, 255, 255, 0.8)',
-                    }}
-                />
-
-                {/* Gems */}
-                {gems.map(gem => (
-                    <div
-                        key={gem.id}
-                        className="absolute rounded-full w-2 h-2"
-                        style={{
-                            backgroundColor: '#ffff00',
-                            left: `${worldToMap(gem.position[0], gem.position[2]).x}px`,
-                            top: `${worldToMap(gem.position[0], gem.position[2]).y}px`,
-                            transform: 'translate(-50%, -50%)',
-                            boxShadow: '0 0 2px 1px rgba(255, 255, 0, 0.5)',
-                        }}
-                    />
-                ))}
-            </div>
-        </div>
-    )
-}
 
 
 function FpsCounter() {
@@ -442,67 +376,35 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, col
 
 
     useFrame(() => {
-
         if (gameState === GAME_STATE.GAME_OVER) return;
 
-
         if (camera) {
-
-            const newX = Math.max(
-                gameBounds.min.x,
-                Math.min(gameBounds.max.x, camera.position.x)
-            )
-            const newZ = Math.max(
-                gameBounds.min.z,
-                Math.min(gameBounds.max.z, camera.position.z)
-            )
-
-
-            if (camera.position.x !== newX || camera.position.z !== newZ) {
-                camera.position.x = newX
-                camera.position.z = newZ
-            }
-
-
-            playerRef.current.set(camera.position.x, 0, camera.position.z)
-            onPlayerMove(playerRef.current.clone())
-
+            playerRef.current.set(camera.position.x, 0, camera.position.z);
+            onPlayerMove(playerRef.current.clone());
 
             if (checkBoundaryCollision(playerRef.current)) {
-
                 onGameOver();
                 playGameOverSound();
                 return;
             }
         }
 
-
-        const playerPos = playerRef.current
+        const playerPos = playerRef.current;
         let gemCollected = false;
 
-
         const updatedGems = gems.map(gem => {
-
             if (gem.isBeingCollected) {
-
                 const newProgress = gem.collectionProgress + GEM_ANIMATION_SPEED;
-
 
                 if (newProgress >= 1) {
                     gemCollected = true;
                     return null;
                 }
 
-
                 const startPos = new Vector3(gem.position[0], gem.position[1], gem.position[2]);
-
-
                 const lerpPos = startPos.clone().lerp(playerPos, newProgress);
-
-
                 const arcHeight = 0.5 * Math.sin(newProgress * Math.PI);
                 lerpPos.y += arcHeight;
-
 
                 return {
                     ...gem,
@@ -511,10 +413,8 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, col
                 };
             }
 
-
             const gemPos = new Vector3(gem.position[0], gem.position[1], gem.position[2]);
             const distance = gemPos.distanceTo(playerPos);
-
 
             if (distance < GEM_ATTRACTION_DISTANCE) {
                 return {
@@ -524,30 +424,26 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, col
                 };
             }
 
-
             return gem;
         }).filter(Boolean) as AnimatedGem[];
-
 
         if (gemCollected) {
             onGemCollect();
             playCollectSound();
         }
 
-
         setGems(updatedGems);
 
-
-        frameCount.current += 1
+        frameCount.current += 1;
         if (frameCount.current % 10 === 0) {
             const activeGems = updatedGems.filter(gem => !gem.isBeingCollected);
-            const gemsToAdd = GEM_SPAWN_COUNT - activeGems.length
+            const gemsToAdd = GEM_SPAWN_COUNT - activeGems.length;
             if (gemsToAdd > 0) {
-                const newGems = []
+                const newGems = [];
                 for (let i = 0; i < gemsToAdd; i++) {
-                    newGems.push(generateGem())
+                    newGems.push(generateGem());
                 }
-                setGems([...updatedGems, ...newGems])
+                setGems([...updatedGems, ...newGems]);
             }
         }
     })
