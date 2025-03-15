@@ -13,14 +13,13 @@ const GAME_BOUNDS = {
 
 // Gem generation settings
 const GEM_SPAWN_COUNT = 200 // Number of gems to keep active
-const GEM_COLLECTION_DISTANCE = 0.8 // Distance within which gems are collected
 
 // Minimap component that shows the bounded game area
 function Minimap({ playerPosition, gems }: {
     playerPosition: Vector3,
     gems: { id: number; position: [number, number, number] }[]
 }) {
-    const minimapSize = 150 // Size in pixels
+    const minimapSize = 220 // Increased size from 150 to 220 pixels
 
     // Calculate scale based on game bounds to fit the minimap
     const scale = minimapSize / Math.max(GAME_BOUNDS.width, GAME_BOUNDS.length)
@@ -49,7 +48,7 @@ function Minimap({ playerPosition, gems }: {
                 />
 
                 {/* Player dot */}
-                <div className="absolute bg-white rounded-full w-3 h-3"
+                <div className="absolute bg-white rounded-full w-4 h-4"
                     style={{
                         left: `${worldToMap(playerPosition.x, playerPosition.z).x}px`,
                         top: `${worldToMap(playerPosition.x, playerPosition.z).y}px`,
@@ -62,7 +61,7 @@ function Minimap({ playerPosition, gems }: {
                 {gems.map(gem => (
                     <div
                         key={gem.id}
-                        className="absolute rounded-full w-1.5 h-1.5"
+                        className="absolute rounded-full w-2 h-2"
                         style={{
                             backgroundColor: '#ffff00',
                             left: `${worldToMap(gem.position[0], gem.position[2]).x}px`,
@@ -77,6 +76,45 @@ function Minimap({ playerPosition, gems }: {
     )
 }
 
+// FPS Counter component
+function FpsCounter() {
+    const [fps, setFps] = useState(0);
+
+    useEffect(() => {
+        let frameCount = 0;
+        let lastTime = performance.now();
+        let frameTime = 0;
+
+        const updateFps = () => {
+            const now = performance.now();
+            frameCount++;
+            frameTime += now - lastTime;
+            lastTime = now;
+
+            // Update FPS every second
+            if (frameTime >= 1000) {
+                setFps(Math.round((frameCount * 1000) / frameTime));
+                frameCount = 0;
+                frameTime = 0;
+            }
+
+            requestAnimationFrame(updateFps);
+        };
+
+        const animationId = requestAnimationFrame(updateFps);
+
+        return () => {
+            cancelAnimationFrame(animationId);
+        };
+    }, []);
+
+    return (
+        <div className="absolute right-4 top-4 bg-black/70 px-3 py-1 rounded-md border border-white/30">
+            <p className="text-green-400 font-mono font-bold">{fps} FPS</p>
+        </div>
+    );
+}
+
 // Add a simple UI overlay for instructions and stats
 function GameUI({ gemCount, collectedGems, playerPosition, gems }: {
     gemCount: number;
@@ -87,6 +125,7 @@ function GameUI({ gemCount, collectedGems, playerPosition, gems }: {
     return (
         <>
             <Minimap playerPosition={playerPosition} gems={gems} />
+            <FpsCounter />
 
             <div className="absolute left-0 bottom-0 w-full p-4">
                 <div className="flex justify-between">
@@ -151,13 +190,25 @@ interface SceneProps {
     onGemsChange: (gems: { id: number; position: [number, number, number] }[]) => void;
 }
 
+// Define a type for gems with animation state
+interface AnimatedGem {
+    id: number;
+    position: [number, number, number];
+    isBeingCollected: boolean;
+    collectionProgress: number;
+}
+
 function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange }: SceneProps) {
     const { camera } = useThree()
     const playerRef = useRef(new Vector3(0, 0, 0))
     const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
-    const [gems, setGems] = useState<{ id: number; position: [number, number, number] }[]>([])
+    const [gems, setGems] = useState<AnimatedGem[]>([])
     const lastGemId = useRef(0)
     const frameCount = useRef(0)
+
+    // Constants for gem collection animation
+    const GEM_ATTRACTION_DISTANCE = 1.8; // Reduced from 2.5 to 1.8 units
+    const GEM_ANIMATION_SPEED = 0.04; // Slowed down from 0.08 to 0.04 (50% slower)
 
     // Create the bounding box for the game area
     const gameBounds = useMemo(() => {
@@ -214,10 +265,18 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange }: S
         camera.lookAt(0, 0, 0)
     }, [camera])
 
-    // Effect to notify parent component of gem count
+    // Effect to notify parent component of gem count and filter out gems being collected
     useEffect(() => {
-        onGemCountChange(gems.length)
-        onGemsChange(gems)
+        // Only count gems that aren't being collected
+        const activeGems = gems.filter(gem => !gem.isBeingCollected);
+        onGemCountChange(activeGems.length)
+
+        // For UI, make a simplified version without animation info
+        const simplifiedGems = gems.map(gem => ({
+            id: gem.id,
+            position: gem.position
+        }));
+        onGemsChange(simplifiedGems)
     }, [gems, onGemCountChange, onGemsChange])
 
     // Spawn initial gems immediately
@@ -231,13 +290,15 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange }: S
     }, [])
 
     // Function to generate a new gem at a random position within game bounds
-    const generateGem = () => {
+    const generateGem = (): AnimatedGem => {
         const x = Math.random() * GAME_BOUNDS.width - GAME_BOUNDS.width / 2
         const z = Math.random() * GAME_BOUNDS.length - GAME_BOUNDS.length / 2
 
         return {
             id: lastGemId.current++,
-            position: [x, 0.5, z] as [number, number, number]
+            position: [x, 0.5, z] as [number, number, number],
+            isBeingCollected: false,
+            collectionProgress: 0
         }
     }
 
@@ -265,39 +326,78 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange }: S
             onPlayerMove(playerRef.current.clone())
         }
 
-        // Check for gem collection every frame
+        // Check for gem collection and update gem animations
         const playerPos = playerRef.current
+        let gemCollected = false;
 
-        // Filter out collected gems
-        const remainingGems = gems.filter(gem => {
-            const gemPos = new Vector3(gem.position[0], gem.position[1], gem.position[2])
-            const distance = gemPos.distanceTo(playerPos)
+        // Update gems (animate collection and remove completed ones)
+        const updatedGems = gems.map(gem => {
+            // Skip gems that are already being collected
+            if (gem.isBeingCollected) {
+                // Update animation progress
+                const newProgress = gem.collectionProgress + GEM_ANIMATION_SPEED;
 
-            // Check if gem is collected
-            if (distance < GEM_COLLECTION_DISTANCE) {
-                onGemCollect()
-                playCollectSound()
-                return false // Remove from array
+                // If animation complete, mark for collection
+                if (newProgress >= 1) {
+                    gemCollected = true;
+                    return null; // Will be filtered out
+                }
+
+                // Update gem position to move toward player
+                const startPos = new Vector3(gem.position[0], gem.position[1], gem.position[2]);
+
+                // Create a more natural arc motion with slight vertical lift as it moves
+                const lerpPos = startPos.clone().lerp(playerPos, newProgress);
+
+                // Add a slight arc to the path (higher in the middle of the animation)
+                const arcHeight = 0.5 * Math.sin(newProgress * Math.PI); // Peaks at middle of animation
+                lerpPos.y += arcHeight;
+
+                // Return updated gem with new position and progress
+                return {
+                    ...gem,
+                    position: [lerpPos.x, lerpPos.y, lerpPos.z] as [number, number, number],
+                    collectionProgress: newProgress
+                };
             }
 
-            return true // Keep the gem
-        })
+            // Check if gem should start being collected
+            const gemPos = new Vector3(gem.position[0], gem.position[1], gem.position[2]);
+            const distance = gemPos.distanceTo(playerPos);
 
-        // Only update if gems were collected
-        if (remainingGems.length < gems.length) {
-            setGems(remainingGems)
+            // Start collection animation if close enough
+            if (distance < GEM_ATTRACTION_DISTANCE) {
+                return {
+                    ...gem,
+                    isBeingCollected: true,
+                    collectionProgress: 0
+                };
+            }
+
+            // If it's not being collected and not close enough, keep it as is
+            return gem;
+        }).filter(Boolean) as AnimatedGem[]; // Filter out nulls (completed animations)
+
+        // If a gem was fully collected, play sound and trigger reward
+        if (gemCollected) {
+            onGemCollect();
+            playCollectSound();
         }
+
+        // Update state with animated gems
+        setGems(updatedGems);
 
         // Spawn new gems if needed (less frequently)
         frameCount.current += 1
         if (frameCount.current % 10 === 0) {
-            const gemsToAdd = GEM_SPAWN_COUNT - remainingGems.length
+            const activeGems = updatedGems.filter(gem => !gem.isBeingCollected);
+            const gemsToAdd = GEM_SPAWN_COUNT - activeGems.length
             if (gemsToAdd > 0) {
                 const newGems = []
                 for (let i = 0; i < gemsToAdd; i++) {
                     newGems.push(generateGem())
                 }
-                setGems([...remainingGems, ...newGems])
+                setGems([...updatedGems, ...newGems])
             }
         }
     })
@@ -308,9 +408,14 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange }: S
             <BoundedGameArea />
             <Player mousePosition={mousePosition} gameBounds={gameBounds} />
 
-            {/* Render all gems */}
+            {/* Render all gems with animation effects */}
             {gems.map(gem => (
-                <Gem key={gem.id} position={gem.position} />
+                <Gem
+                    key={gem.id}
+                    position={gem.position}
+                    isBeingCollected={gem.isBeingCollected}
+                    collectionProgress={gem.collectionProgress}
+                />
             ))}
         </>
     )
