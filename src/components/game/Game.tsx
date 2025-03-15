@@ -12,14 +12,19 @@ const GAME_BOUNDS = {
 }
 
 // Gem generation settings
-const GEM_SPAWN_COUNT = 200 // Number of gems to keep active
+const GEM_SPAWN_COUNT = 300 // Increased from 200 to 300 gems
+
+// Player movement settings
+const BASE_PLAYER_SPEED = 0.08 // Increased initial speed
+const MIN_PLAYER_SPEED = 0.03 // Minimum speed when tail is very long
+const TAIL_SEGMENT_PER_GEMS = 10 // Add a new tail segment for every 10 gems collected
 
 // Minimap component that shows the bounded game area
 function Minimap({ playerPosition, gems }: {
     playerPosition: Vector3,
     gems: { id: number; position: [number, number, number] }[]
 }) {
-    const minimapSize = 220 // Increased size from 150 to 220 pixels
+    const minimapSize = 320 // Increased size from 150 to 220 pixels
 
     // Calculate scale based on game bounds to fit the minimap
     const scale = minimapSize / Math.max(GAME_BOUNDS.width, GAME_BOUNDS.length)
@@ -122,6 +127,14 @@ function GameUI({ gemCount, collectedGems, playerPosition, gems }: {
     playerPosition: Vector3;
     gems: { id: number; position: [number, number, number] }[];
 }) {
+    // Calculate tail segments and speed for display
+    const tailSegments = Math.floor(collectedGems / TAIL_SEGMENT_PER_GEMS);
+    const playerSpeed = Math.max(
+        MIN_PLAYER_SPEED,
+        BASE_PLAYER_SPEED * (1 - (tailSegments * 0.02))
+    );
+    const speedPercentage = Math.round((playerSpeed / BASE_PLAYER_SPEED) * 100);
+
     return (
         <>
             <Minimap playerPosition={playerPosition} gems={gems} />
@@ -133,10 +146,13 @@ function GameUI({ gemCount, collectedGems, playerPosition, gems }: {
                         <p>Move your mouse to control direction</p>
                         <p>Player will move towards mouse pointer</p>
                         <p className="text-yellow-200">Stay within the game boundaries</p>
+                        <p className="text-blue-300">Tail Length: {tailSegments} segments</p>
+                        <p className="text-green-300">Speed: {speedPercentage}%</p>
                     </div>
                     <div className="bg-black/50 p-2 rounded text-white text-sm">
                         <p>Active Gems: {gemCount}</p>
                         <p className="text-yellow-300 font-bold">Collected: {collectedGems} ✨</p>
+                        <p className="text-gray-300 text-xs">Every {TAIL_SEGMENT_PER_GEMS} gems add 1 tail segment</p>
                     </div>
                 </div>
             </div>
@@ -171,6 +187,7 @@ function Game() {
                     onGemCollect={() => setCollectedGems(prev => prev + 1)}
                     onPlayerMove={setPlayerPosition}
                     onGemsChange={setGemsForUI}
+                    collectedGems={collectedGems}
                 />
             </Canvas>
             <GameUI
@@ -188,6 +205,7 @@ interface SceneProps {
     onGemCollect: () => void;
     onPlayerMove: (position: Vector3) => void;
     onGemsChange: (gems: { id: number; position: [number, number, number] }[]) => void;
+    collectedGems: number;
 }
 
 // Define a type for gems with animation state
@@ -198,13 +216,22 @@ interface AnimatedGem {
     collectionProgress: number;
 }
 
-function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange }: SceneProps) {
+function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange, collectedGems }: SceneProps) {
     const { camera } = useThree()
     const playerRef = useRef(new Vector3(0, 0, 0))
     const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 })
     const [gems, setGems] = useState<AnimatedGem[]>([])
     const lastGemId = useRef(0)
     const frameCount = useRef(0)
+
+    // Calculate tail segments based on collected gems
+    const tailSegments = Math.floor(collectedGems / TAIL_SEGMENT_PER_GEMS)
+
+    // Calculate player speed based on tail length
+    const playerSpeed = Math.max(
+        MIN_PLAYER_SPEED,
+        BASE_PLAYER_SPEED * (1 - (tailSegments * 0.02)) // Reduce speed by 2% per tail segment
+    )
 
     // Constants for gem collection animation
     const GEM_ATTRACTION_DISTANCE = 1.8; // Reduced from 2.5 to 1.8 units
@@ -406,7 +433,12 @@ function Scene({ onGemCountChange, onGemCollect, onPlayerMove, onGemsChange }: S
         <>
             <PerspectiveCamera makeDefault position={[0, 15, 0]} fov={60} />
             <BoundedGameArea />
-            <Player mousePosition={mousePosition} gameBounds={gameBounds} />
+            <Player
+                mousePosition={mousePosition}
+                gameBounds={gameBounds}
+                tailSegments={tailSegments}
+                speed={playerSpeed}
+            />
 
             {/* Render all gems with animation effects */}
             {gems.map(gem => (

@@ -1,20 +1,59 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { Mesh, Vector3, Vector2, Raycaster, Plane, Box3 } from 'three'
+import { Mesh, Vector3, Vector2, Raycaster, Plane, Box3, Color } from 'three'
 
 interface PlayerProps {
     mousePosition: { x: number; y: number }
     gameBounds: Box3
+    tailSegments: number
+    speed: number
 }
 
-function Player({ mousePosition, gameBounds }: PlayerProps) {
+// Tail segment component
+function TailSegment({ position, index }: { position: Vector3; index: number }) {
+    // Gradient color from blue to purple based on index
+    const colorValue = Math.min(0.6 + index * 0.03, 1);
+    const segmentColor = new Color(0.3, 0.3, colorValue);
+
+    // Size gets slightly smaller the further back in the tail
+    const sizeMultiplier = Math.max(0.8, 1 - index * 0.015);
+    const segmentSize = 0.25 * sizeMultiplier;
+
+    return (
+        <mesh position={position} castShadow>
+            <boxGeometry args={[segmentSize, segmentSize, segmentSize]} />
+            <meshStandardMaterial
+                color={segmentColor}
+                emissive={segmentColor}
+                emissiveIntensity={0.5}
+                metalness={0.7}
+                roughness={0.2}
+            />
+        </mesh>
+    );
+}
+
+function Player({ mousePosition, gameBounds, tailSegments, speed }: PlayerProps) {
     const playerRef = useRef<Mesh>(null)
     const { camera } = useThree()
-    const speed = useRef(0.05)
+    const speedRef = useRef(speed)
     const raycaster = useRef(new Raycaster())
     const plane = useRef(new Plane(new Vector3(0, 1, 0), 0))
     const targetPoint = useRef(new Vector3())
     const mouse2D = useRef(new Vector2())
+
+    // Store tail segment positions
+    const [tailPositions, setTailPositions] = useState<Vector3[]>([]);
+
+    // Store player position history for tail segments to follow
+    const positionHistory = useRef<Vector3[]>([]);
+    const MAX_HISTORY = 300; // Maximum positions to store (for very long tails)
+    const SEGMENT_SPACING = 5; // How many positions to skip between segments
+
+    // Update speed ref when speed prop changes
+    useEffect(() => {
+        speedRef.current = speed;
+    }, [speed]);
 
     const [debug, setDebug] = useState(false)
 
@@ -36,6 +75,12 @@ function Player({ mousePosition, gameBounds }: PlayerProps) {
         )
     }
 
+    // Initialize position history
+    useEffect(() => {
+        const initialPosition = new Vector3(0, 0.5, 0);
+        positionHistory.current = Array(MAX_HISTORY).fill(initialPosition.clone());
+    }, []);
+
     useFrame(() => {
         if (!playerRef.current || !camera) return
 
@@ -55,9 +100,9 @@ function Player({ mousePosition, gameBounds }: PlayerProps) {
                 const angleDifference = shortestAngleBetween(currentRotation, targetAngle)
                 playerRef.current.rotation.y += angleDifference * 0.1
 
-                // Calculate potential new position
-                const newX = camera.position.x + direction.x * speed.current
-                const newZ = camera.position.z + direction.z * speed.current
+                // Calculate potential new position - use the dynamic speed
+                const newX = camera.position.x + direction.x * speedRef.current
+                const newZ = camera.position.z + direction.z * speedRef.current
 
                 // Check if new position is within bounds
                 const constrainedPosition = constrainToGameBounds(new Vector3(newX, camera.position.y, newZ))
@@ -67,6 +112,27 @@ function Player({ mousePosition, gameBounds }: PlayerProps) {
                 camera.position.z = constrainedPosition.z
                 playerRef.current.position.x = camera.position.x
                 playerRef.current.position.z = camera.position.z
+
+                // Record the current position for tail segments
+                const currentPos = new Vector3(
+                    playerRef.current.position.x,
+                    0.5, // Fixed height
+                    playerRef.current.position.z
+                );
+
+                // Shift history and add new position
+                positionHistory.current.unshift(currentPos);
+                positionHistory.current = positionHistory.current.slice(0, MAX_HISTORY);
+
+                // Update tail positions
+                if (tailSegments > 0) {
+                    const newTailPositions = [];
+                    for (let i = 0; i < tailSegments; i++) {
+                        const historyIndex = Math.min((i + 1) * SEGMENT_SPACING, positionHistory.current.length - 1);
+                        newTailPositions.push(positionHistory.current[historyIndex].clone());
+                    }
+                    setTailPositions(newTailPositions);
+                }
             }
         }
     })
@@ -94,6 +160,11 @@ function Player({ mousePosition, gameBounds }: PlayerProps) {
                     />
                 </mesh>
             </mesh>
+
+            {/* Render tail segments */}
+            {tailPositions.map((position, index) => (
+                <TailSegment key={index} position={position} index={index} />
+            ))}
 
             {/* Optional debug visualizer for target point */}
             {debug && (
