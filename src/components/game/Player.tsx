@@ -3,8 +3,8 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Mesh, Vector3, Box3 } from 'three'
 
 
-import DirectionalArrow from './DirectionalArrow'
 import TailSegment from './TailSegment'
+import DirectionalArrow from './DirectionalArrow'
 
 
 import { usePlayerMovement } from '../../hooks/usePlayerMovement'
@@ -79,6 +79,7 @@ function Player({ mousePosition, gameBounds, tailSegments, speed, gameState = 'p
 
     return (
         <>
+
             <mesh ref={playerRef} position={[0, 0.5, 0]} castShadow>
                 <meshStandardMaterial color="#4c9eff" />
                 <cylinderGeometry args={[0.3, 0.3, 0.5, 16]} />
@@ -95,10 +96,10 @@ function Player({ mousePosition, gameBounds, tailSegments, speed, gameState = 'p
                         emissive="#ff0000"
                         emissiveIntensity={0.8}
                     />
-                </mesh>
+                </mesh>        <DirectionalArrow />                </mesh>
 
-                {gameState === 'playing' && <DirectionalArrow />}
-            </mesh>
+
+
 
             {tailPositions.map((position, index) => (
                 <TailSegment key={index} position={position} index={index} />
